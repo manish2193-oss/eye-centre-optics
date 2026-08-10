@@ -522,8 +522,10 @@ function App() {
 
     link.href = downloadUrl;
     link.download = `eye-centre-optics-backup-${getLocalDate()}.csv`;
+    document.body.appendChild(link);
     link.click();
-    URL.revokeObjectURL(downloadUrl);
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
   }
 
   return (
