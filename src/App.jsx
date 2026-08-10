@@ -3,7 +3,6 @@ import { isSupabaseConfigured, supabase } from "./supabase";
 
 const STORAGE_KEY = "eye-centre-optics-records";
 const LAST_SEQUENCE_KEY = "eye-centre-optics-last-sequence";
-const AUTHORIZED_EMAIL = "anilgupta.eyecentre@gmail.com";
 
 const initialCustomer = {
   fullName: "",
@@ -225,7 +224,7 @@ function PrintablePrescription({ record }) {
 }
 
 function LoginScreen({ authError, isSubmitting, onSignIn }) {
-  const [email, setEmail] = useState(AUTHORIZED_EMAIL);
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   function handleLogin(event) {
@@ -323,22 +322,13 @@ function App() {
 
     supabase.auth.getSession().then(({ data }) => {
       const currentSession = data.session;
-      const email = currentSession?.user?.email?.toLowerCase();
-
-      if (currentSession && email !== AUTHORIZED_EMAIL) {
-        supabase.auth.signOut();
-        setAuthError("This account is not authorized for Eye Centre Optics.");
-      } else {
-        setSession(currentSession);
-      }
+      setSession(currentSession);
       setAuthLoading(false);
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      if (!nextSession || nextSession.user.email?.toLowerCase() === AUTHORIZED_EMAIL) {
-        setSession(nextSession);
-        if (!nextSession) setRecords([]);
-      }
+      setSession(nextSession);
+      if (!nextSession) setRecords([]);
     });
 
     return () => listener.subscription.unsubscribe();
@@ -410,11 +400,6 @@ function App() {
 
   async function handleSignIn(email, password) {
     if (!supabase) return;
-
-    if (email.toLowerCase() !== AUTHORIZED_EMAIL) {
-      setAuthError("This email is not authorized for Eye Centre Optics.");
-      return;
-    }
 
     setAuthSubmitting(true);
     setAuthError("");
