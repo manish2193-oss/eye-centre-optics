@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { isSupabaseConfigured, supabase } from "./supabase";
 
 const STORAGE_KEY = "eye-centre-optics-records";
 const LAST_SEQUENCE_KEY = "eye-centre-optics-last-sequence";
+const AUTHORIZED_EMAIL = "anilgupta.eyecentre@gmail.com";
 
 const initialCustomer = {
   fullName: "",
@@ -56,11 +58,7 @@ function calculateBalance(total, advance) {
   return (totalAmount - advanceAmount).toFixed(2);
 }
 
-function formatRecordNumber(sequence) {
-  return `ECO-${String(sequence).padStart(4, "0")}`;
-}
-
-function loadRecords() {
+function loadLocalRecords() {
   try {
     const storedRecords = localStorage.getItem(STORAGE_KEY);
     const parsedRecords = storedRecords ? JSON.parse(storedRecords) : [];
@@ -70,30 +68,46 @@ function loadRecords() {
   }
 }
 
-function getNextSequence(records) {
-  const highestSequence = records.reduce((highest, record) => {
-    const sequence = Number(record.recordNumber?.replace("ECO-", ""));
-    return Number.isFinite(sequence) ? Math.max(highest, sequence) : highest;
-  }, 0);
-
-  let storedSequence;
-
-  try {
-    storedSequence = Number(localStorage.getItem(LAST_SEQUENCE_KEY)) || 0;
-  } catch {
-    storedSequence = 0;
-  }
-
-  return Math.max(highestSequence, storedSequence) + 1;
-}
-
-function createRecordMetadata(sequence) {
+function createRecordMetadata() {
   const startedAt = new Date().toISOString();
 
   return {
-    recordNumber: formatRecordNumber(sequence),
+    id: null,
+    recordNumber: "Assigned when saved",
     createdAt: startedAt,
     updatedAt: startedAt,
+  };
+}
+
+function mapDatabaseRecord(row) {
+  return {
+    id: row.id,
+    recordNumber: row.record_number,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    customer: {
+      fullName: row.full_name,
+      age: row.age?.toString() ?? "",
+      sex: row.sex ?? "",
+      phone: row.phone ?? "",
+      address: row.address,
+      complaints: row.complaints ?? "",
+    },
+    prescription: row.prescription ?? createInitialPrescription(),
+    order: row.order_details ?? createInitialOrder(),
+  };
+}
+
+function createDatabasePayload(customer, prescription, order) {
+  return {
+    full_name: customer.fullName.trim(),
+    age: customer.age === "" ? null : Number(customer.age),
+    sex: customer.sex || null,
+    phone: customer.phone || null,
+    address: customer.address.trim(),
+    complaints: customer.complaints || null,
+    prescription,
+    order_details: order,
   };
 }
 
@@ -210,10 +224,60 @@ function PrintablePrescription({ record }) {
   );
 }
 
+function LoginScreen({ authError, isSubmitting, onSignIn }) {
+  const [email, setEmail] = useState(AUTHORIZED_EMAIL);
+  const [password, setPassword] = useState("");
+
+  function handleLogin(event) {
+    event.preventDefault();
+    onSignIn(email.trim(), password);
+  }
+
+  return (
+    <main className="login-shell">
+      <section className="login-card" aria-labelledby="login-heading">
+        <p className="shop-kicker">Eye Centre Optics</p>
+        <h1 id="login-heading">Sign in</h1>
+        <p>Use the authorized shop account to access customer records.</p>
+
+        <form onSubmit={handleLogin}>
+          <div className="field">
+            <label htmlFor="loginEmail">Email</label>
+            <input
+              id="loginEmail"
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              autoComplete="username"
+              required
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="loginPassword">Password</label>
+            <input
+              id="loginPassword"
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              autoComplete="current-password"
+              required
+            />
+          </div>
+          {authError && <p className="login-error" role="alert">{authError}</p>}
+          <button className="primary-button" type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Signing in…" : "Sign in"}
+          </button>
+        </form>
+      </section>
+    </main>
+  );
+}
+
 function App() {
-  const [records, setRecords] = useState(loadRecords);
+  const [records, setRecords] = useState([]);
+  const [localRecords, setLocalRecords] = useState(loadLocalRecords);
   const [activeTab, setActiveTab] = useState("new");
-  const [metadata, setMetadata] = useState(() => createRecordMetadata(getNextSequence(records)));
+  const [metadata, setMetadata] = useState(createRecordMetadata);
   const [customer, setCustomer] = useState(initialCustomer);
   const [prescription, setPrescription] = useState(createInitialPrescription);
   const [order, setOrder] = useState(createInitialOrder);
@@ -224,6 +288,65 @@ function App() {
   const [isEditing, setIsEditing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [printRecord, setPrintRecord] = useState(null);
+  const [session, setSession] = useState(null);
+  const [authLoading, setAuthLoading] = useState(isSupabaseConfigured);
+  const [authSubmitting, setAuthSubmitting] = useState(false);
+  const [authError, setAuthError] = useState("");
+  const [dataLoading, setDataLoading] = useState(false);
+
+  useEffect(() => {
+    if (!supabase) {
+      return undefined;
+    }
+
+    supabase.auth.getSession().then(({ data }) => {
+      const currentSession = data.session;
+      const email = currentSession?.user?.email?.toLowerCase();
+
+      if (currentSession && email !== AUTHORIZED_EMAIL) {
+        supabase.auth.signOut();
+        setAuthError("This account is not authorized for Eye Centre Optics.");
+      } else {
+        setSession(currentSession);
+      }
+      setAuthLoading(false);
+    });
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      if (!nextSession || nextSession.user.email?.toLowerCase() === AUTHORIZED_EMAIL) {
+        setSession(nextSession);
+        if (!nextSession) setRecords([]);
+      }
+    });
+
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!session || !supabase) {
+      return undefined;
+    }
+
+    let active = true;
+
+    supabase
+      .from("optical_records")
+      .select("*")
+      .order("id", { ascending: true })
+      .then(({ data, error }) => {
+        if (!active) return;
+        if (error) {
+          setStorageError(`Cloud records could not be loaded: ${error.message}`);
+        } else {
+          setRecords(data.map(mapDatabaseRecord));
+        }
+        setDataLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [session]);
 
   const normalizedSearch = searchQuery.trim().toLowerCase();
   const filteredRecords = records.filter((record) => (
@@ -238,8 +361,8 @@ function App() {
     );
   }
 
-  function resetForm(sequence) {
-    setMetadata(createRecordMetadata(sequence));
+  function resetForm() {
+    setMetadata(createRecordMetadata());
     setCustomer(initialCustomer);
     setPrescription(createInitialPrescription());
     setOrder(createInitialOrder());
@@ -259,8 +382,33 @@ function App() {
       return;
     }
 
-    resetForm(getNextSequence(records));
+    resetForm();
     setActiveTab(nextTab);
+  }
+
+  async function handleSignIn(email, password) {
+    if (!supabase) return;
+
+    if (email.toLowerCase() !== AUTHORIZED_EMAIL) {
+      setAuthError("This email is not authorized for Eye Centre Optics.");
+      return;
+    }
+
+    setAuthSubmitting(true);
+    setAuthError("");
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+
+    if (error) {
+      setAuthError(error.message);
+    }
+    setAuthSubmitting(false);
+  }
+
+  async function handleSignOut() {
+    if (!supabase || !confirmDiscardChanges()) return;
+    await supabase.auth.signOut();
+    resetForm();
+    setActiveTab("new");
   }
 
   function handleChange(event) {
@@ -284,7 +432,7 @@ function App() {
     setHasUnsavedChanges(true);
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
 
     const nextErrors = {};
@@ -301,51 +449,40 @@ function App() {
 
     setErrors(nextErrors);
 
-    if (formIsValid) {
-      const savedMetadata = {
-        ...metadata,
-        updatedAt: new Date().toISOString(),
-      };
-      const savedRecord = {
-        ...savedMetadata,
-        customer: {
-          ...customer,
-          fullName: customer.fullName.trim(),
-          address: customer.address.trim(),
-        },
-        prescription,
-        order,
-      };
-      const existingRecordIndex = records.findIndex(
-        (record) => record.recordNumber === savedRecord.recordNumber,
-      );
-      const nextRecords = [...records];
+    if (formIsValid && supabase) {
+      setDataLoading(true);
+      setStorageError("");
+      const payload = createDatabasePayload(customer, prescription, order);
+      const query = metadata.id
+        ? supabase.from("optical_records").update(payload).eq("id", metadata.id)
+        : supabase.from("optical_records").insert(payload);
+      const { data, error } = await query.select().single();
 
-      if (existingRecordIndex >= 0) {
-        nextRecords[existingRecordIndex] = savedRecord;
+      if (error) {
+        setStorageError(`The record could not be saved: ${error.message}`);
+        setSaveMessage("");
       } else {
-        nextRecords.push(savedRecord);
-      }
-
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(nextRecords));
-        const savedSequence = Number(savedRecord.recordNumber.replace("ECO-", ""));
-        const previousSequence = Number(localStorage.getItem(LAST_SEQUENCE_KEY)) || 0;
-        localStorage.setItem(
-          LAST_SEQUENCE_KEY,
-          String(Math.max(previousSequence, Number.isFinite(savedSequence) ? savedSequence : 0)),
-        );
-        setRecords(nextRecords);
-        setMetadata(savedMetadata);
+        const savedRecord = mapDatabaseRecord(data);
+        setRecords((currentRecords) => {
+          const exists = currentRecords.some((record) => record.id === savedRecord.id);
+          return exists
+            ? currentRecords.map((record) => (
+                record.id === savedRecord.id ? savedRecord : record
+              ))
+            : [...currentRecords, savedRecord];
+        });
+        setMetadata({
+          id: savedRecord.id,
+          recordNumber: savedRecord.recordNumber,
+          createdAt: savedRecord.createdAt,
+          updatedAt: savedRecord.updatedAt,
+        });
         setCustomer(savedRecord.customer);
-        setSaveMessage(`${savedRecord.recordNumber} saved successfully.`);
-        setStorageError("");
+        setSaveMessage(`${savedRecord.recordNumber} saved securely to the cloud.`);
         setHasUnsavedChanges(false);
         setIsEditing(true);
-      } catch {
-        setStorageError("The record could not be saved in this browser. Please try again.");
-        setSaveMessage("");
       }
+      setDataLoading(false);
     }
   }
 
@@ -429,14 +566,13 @@ function App() {
       return;
     }
 
-    const nextSequence = getNextSequence(records);
-
-    resetForm(nextSequence);
+    resetForm();
     setActiveTab("new");
   }
 
   function handleOpenRecord(record) {
     setMetadata({
+      id: record.id,
       recordNumber: record.recordNumber,
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
@@ -457,11 +593,11 @@ function App() {
       return;
     }
 
-    resetForm(getNextSequence(records));
+    resetForm();
     setActiveTab("records");
   }
 
-  function handleDeleteRecord(record) {
+  async function handleDeleteRecord(record) {
     const shouldDelete = window.confirm(
       `Delete ${record.recordNumber} for ${record.customer.fullName}? This cannot be undone.`,
     );
@@ -470,16 +606,55 @@ function App() {
       return;
     }
 
-    const nextRecords = records.filter(
-      (currentRecord) => currentRecord.recordNumber !== record.recordNumber,
+    setDataLoading(true);
+    const { error } = await supabase.from("optical_records").delete().eq("id", record.id);
+
+    if (error) {
+      window.alert(`The record could not be deleted: ${error.message}`);
+    } else {
+      setRecords((currentRecords) => currentRecords.filter(
+        (currentRecord) => currentRecord.id !== record.id,
+      ));
+    }
+    setDataLoading(false);
+  }
+
+  async function handleImportLocalRecords() {
+    if (!localRecords.length || !supabase) return;
+
+    const shouldImport = window.confirm(
+      `Import ${localRecords.length} local ${localRecords.length === 1 ? "record" : "records"} into the secure cloud database? New ECO numbers will be assigned.`,
     );
 
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(nextRecords));
-      setRecords(nextRecords);
-    } catch {
-      window.alert("The record could not be deleted. Please try again.");
+    if (!shouldImport) return;
+
+    setDataLoading(true);
+    setStorageError("");
+    const payloads = localRecords.map((record) => ({
+      ...createDatabasePayload(
+        record.customer,
+        record.prescription ?? createInitialPrescription(),
+        record.order ?? createInitialOrder(),
+      ),
+      created_at: record.createdAt,
+      updated_at: record.updatedAt,
+    }));
+    const { data, error } = await supabase
+      .from("optical_records")
+      .insert(payloads)
+      .select();
+
+    if (error) {
+      setStorageError(`Local records could not be imported: ${error.message}`);
+    } else {
+      const importedRecords = data.map(mapDatabaseRecord);
+      setRecords((currentRecords) => [...currentRecords, ...importedRecords]);
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(LAST_SEQUENCE_KEY);
+      setLocalRecords([]);
+      setSaveMessage(`${importedRecords.length} local ${importedRecords.length === 1 ? "record" : "records"} imported securely.`);
     }
+    setDataLoading(false);
   }
 
   function handlePrintRecord(record) {
@@ -528,13 +703,46 @@ function App() {
     window.setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
   }
 
+  if (!isSupabaseConfigured) {
+    return (
+      <main className="login-shell">
+        <section className="login-card">
+          <h1>Supabase configuration required</h1>
+          <p>Add the project URL and publishable key to the Vite environment before starting the app.</p>
+        </section>
+      </main>
+    );
+  }
+
+  if (authLoading) {
+    return <main className="loading-screen">Checking secure session…</main>;
+  }
+
+  if (!session) {
+    return (
+      <LoginScreen
+        authError={authError}
+        isSubmitting={authSubmitting}
+        onSignIn={handleSignIn}
+      />
+    );
+  }
+
   return (
     <>
     <div className="app-shell">
       <header className="shop-header">
-        <p className="shop-kicker">Spectacles · Contact Lenses · Goggles</p>
-        <h1>Eye Centre Optics</h1>
-        <p>Shop No. 31, Sector 8, Panchkula — 134109, Haryana, India</p>
+        <div>
+          <p className="shop-kicker">Spectacles · Contact Lenses · Goggles</p>
+          <h1>Eye Centre Optics</h1>
+          <p>Shop No. 31, Sector 8, Panchkula — 134109, Haryana, India</p>
+        </div>
+        <div className="account-controls">
+          <p>{session.user.email}</p>
+          <button className="secondary-button" type="button" onClick={handleSignOut}>
+            Sign out
+          </button>
+        </div>
       </header>
 
       <nav className="tabs" aria-label="Main sections">
@@ -557,6 +765,22 @@ function App() {
       </nav>
 
       <main className="content-card">
+        {localRecords.length > 0 && (
+          <aside className="migration-banner">
+            <div>
+              <strong>{localRecords.length} local {localRecords.length === 1 ? "record is" : "records are"} available</strong>
+              <p>Import them once into the secure cloud database. New ECO numbers will be assigned.</p>
+            </div>
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={handleImportLocalRecords}
+              disabled={dataLoading}
+            >
+              Import local records
+            </button>
+          </aside>
+        )}
         {activeTab === "new" && (
           <section aria-labelledby="customer-heading">
             <div className="section-heading">
@@ -944,7 +1168,9 @@ function App() {
                     Cancel Edit
                   </button>
                 )}
-                <button className="primary-button" type="submit">Save Record</button>
+                <button className="primary-button" type="submit" disabled={dataLoading}>
+                  {dataLoading ? "Saving…" : "Save Record"}
+                </button>
               </div>
             </form>
           </section>
@@ -974,7 +1200,9 @@ function App() {
               </div>
             </div>
 
-            {records.length === 0 ? (
+            {dataLoading && records.length === 0 ? (
+              <div className="empty-state"><p>Loading secure records…</p></div>
+            ) : records.length === 0 ? (
               <div className="empty-state">
                 <p>No records yet — saved customer records will appear here.</p>
               </div>
