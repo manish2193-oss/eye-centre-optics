@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 const STORAGE_KEY = "eye-centre-optics-records";
+const LAST_SEQUENCE_KEY = "eye-centre-optics-last-sequence";
 
 const initialCustomer = {
   fullName: "",
@@ -75,7 +76,15 @@ function getNextSequence(records) {
     return Number.isFinite(sequence) ? Math.max(highest, sequence) : highest;
   }, 0);
 
-  return highestSequence + 1;
+  let storedSequence;
+
+  try {
+    storedSequence = Number(localStorage.getItem(LAST_SEQUENCE_KEY)) || 0;
+  } catch {
+    storedSequence = 0;
+  }
+
+  return Math.max(highestSequence, storedSequence) + 1;
 }
 
 function createRecordMetadata(sequence) {
@@ -121,6 +130,14 @@ function App() {
   const [storageError, setStorageError] = useState("");
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const normalizedSearch = searchQuery.trim().toLowerCase();
+  const filteredRecords = records.filter((record) => (
+    record.customer.fullName.toLowerCase().includes(normalizedSearch)
+    || record.customer.phone.toLowerCase().includes(normalizedSearch)
+    || record.recordNumber.toLowerCase().includes(normalizedSearch)
+  ));
 
   function confirmDiscardChanges() {
     return !hasUnsavedChanges || window.confirm(
@@ -219,6 +236,12 @@ function App() {
 
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(nextRecords));
+        const savedSequence = Number(savedRecord.recordNumber.replace("ECO-", ""));
+        const previousSequence = Number(localStorage.getItem(LAST_SEQUENCE_KEY)) || 0;
+        localStorage.setItem(
+          LAST_SEQUENCE_KEY,
+          String(Math.max(previousSequence, Number.isFinite(savedSequence) ? savedSequence : 0)),
+        );
         setRecords(nextRecords);
         setMetadata(savedMetadata);
         setCustomer(savedRecord.customer);
@@ -343,6 +366,27 @@ function App() {
 
     resetForm(getNextSequence(records));
     setActiveTab("records");
+  }
+
+  function handleDeleteRecord(record) {
+    const shouldDelete = window.confirm(
+      `Delete ${record.recordNumber} for ${record.customer.fullName}? This cannot be undone.`,
+    );
+
+    if (!shouldDelete) {
+      return;
+    }
+
+    const nextRecords = records.filter(
+      (currentRecord) => currentRecord.recordNumber !== record.recordNumber,
+    );
+
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(nextRecords));
+      setRecords(nextRecords);
+    } catch {
+      window.alert("The record could not be deleted. Please try again.");
+    }
   }
 
   return (
@@ -773,7 +817,11 @@ function App() {
                 <p className="eyebrow">Records</p>
                 <h2 id="records-heading">Saved customer records</h2>
               </div>
-              <p>{records.length} {records.length === 1 ? "record" : "records"}</p>
+              <p>
+                {normalizedSearch
+                  ? `${filteredRecords.length} of ${records.length} records`
+                  : `${records.length} ${records.length === 1 ? "record" : "records"}`}
+              </p>
             </div>
 
             {records.length === 0 ? (
@@ -781,8 +829,25 @@ function App() {
                 <p>No records yet — saved customer records will appear here.</p>
               </div>
             ) : (
-              <div className="records-list">
-                {records
+              <>
+                <div className="records-search field">
+                  <label htmlFor="recordSearch">Search records</label>
+                  <input
+                    id="recordSearch"
+                    type="search"
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    placeholder="Name, phone, or record number"
+                  />
+                </div>
+
+                {filteredRecords.length === 0 ? (
+                  <div className="empty-state search-empty">
+                    <p>No records match “{searchQuery.trim()}”.</p>
+                  </div>
+                ) : (
+                  <div className="records-list">
+                    {filteredRecords
                   .slice()
                   .reverse()
                   .map((record) => (
@@ -795,17 +860,28 @@ function App() {
                       <div className="record-card-details">
                         <p>{record.customer.address}</p>
                         <p>Created {formatDateTime(record.createdAt)}</p>
-                        <button
-                          className="open-record-button"
-                          type="button"
-                          onClick={() => handleOpenRecord(record)}
-                        >
-                          Open
-                        </button>
+                        <div className="record-actions">
+                          <button
+                            className="open-record-button"
+                            type="button"
+                            onClick={() => handleOpenRecord(record)}
+                          >
+                            Open
+                          </button>
+                          <button
+                            className="delete-record-button"
+                            type="button"
+                            onClick={() => handleDeleteRecord(record)}
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </div>
                     </article>
                   ))}
-              </div>
+                  </div>
+                )}
+              </>
             )}
           </section>
         )}

@@ -89,6 +89,7 @@ button {
 .tab:focus-visible,
 .secondary-button:focus-visible,
 .open-record-button:focus-visible,
+.delete-record-button:focus-visible,
 .primary-button:focus-visible {
   outline: 3px solid rgb(38 113 93 / 30%);
   outline-offset: 2px;
@@ -456,6 +457,15 @@ button {
   gap: 12px;
 }
 
+.records-search {
+  max-width: 480px;
+  margin-bottom: 20px;
+}
+
+.search-empty {
+  padding-block: 32px;
+}
+
 .record-card {
   display: grid;
   grid-template-columns: minmax(180px, 0.8fr) minmax(0, 1.2fr);
@@ -504,6 +514,32 @@ button {
   color: #17634f;
   background: #fff;
   font-weight: 750;
+}
+
+.record-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.record-actions .open-record-button {
+  margin-top: 0;
+}
+
+.delete-record-button {
+  min-width: 88px;
+  padding: 8px 15px;
+  border: 1px solid #d2a4a4;
+  border-radius: 7px;
+  color: #9d3030;
+  background: #fff;
+  font-weight: 750;
+}
+
+.delete-record-button:hover {
+  border-color: #a42f2f;
+  background: #fff4f4;
 }
 
 .open-record-button:hover {
