@@ -1,0 +1,26 @@
+{
+  "name": "Eye Centre Optics",
+  "short_name": "Eye Centre",
+  "description": "Customer records and optical prescriptions for Eye Centre Optics.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#f3f6f4",
+  "theme_color": "#123f33",
+  "orientation": "any",
+  "categories": ["medical", "business", "productivity"],
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
