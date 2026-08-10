@@ -235,40 +235,62 @@ function LoginScreen({ authError, isSubmitting, onSignIn }) {
 
   return (
     <main className="login-shell">
-      <section className="login-card" aria-labelledby="login-heading">
-        <p className="shop-kicker">Eye Centre Optics</p>
-        <h1 id="login-heading">Sign in</h1>
-        <p>Use the authorized shop account to access customer records.</p>
+      <div className="login-layout">
+        <aside className="login-story" aria-label="Eye Centre Optics">
+          <div className="brand-mark" aria-hidden="true"><span /></div>
+          <p className="shop-kicker">Eye Centre Optics · Panchkula</p>
+          <h1>Clear vision.<br />Thoughtful care.</h1>
+          <p>A secure workspace for customer records, precise prescriptions and dependable follow-up.</p>
+          <div className="login-trust-line">
+            <span>Optical records</span>
+            <span>Secure cloud</span>
+            <span>Ready to print</span>
+          </div>
+        </aside>
 
-        <form onSubmit={handleLogin}>
-          <div className="field">
-            <label htmlFor="loginEmail">Email</label>
-            <input
-              id="loginEmail"
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              autoComplete="username"
-              required
-            />
+        <section className="login-card" aria-labelledby="login-heading">
+          <div className="login-card-brand">
+            <div className="brand-mark brand-mark-small" aria-hidden="true"><span /></div>
+            <div>
+              <strong>Eye Centre Optics</strong>
+              <span>Shop records</span>
+            </div>
           </div>
-          <div className="field">
-            <label htmlFor="loginPassword">Password</label>
-            <input
-              id="loginPassword"
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              autoComplete="current-password"
-              required
-            />
-          </div>
-          {authError && <p className="login-error" role="alert">{authError}</p>}
-          <button className="primary-button" type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Signing in…" : "Sign in"}
-          </button>
-        </form>
-      </section>
+          <p className="eyebrow">Authorized access</p>
+          <h2 id="login-heading">Welcome back</h2>
+          <p>Sign in to manage customer records and optical prescriptions.</p>
+
+          <form onSubmit={handleLogin}>
+            <div className="field">
+              <label htmlFor="loginEmail">Email</label>
+              <input
+                id="loginEmail"
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                autoComplete="username"
+                required
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="loginPassword">Password</label>
+              <input
+                id="loginPassword"
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                autoComplete="current-password"
+                required
+              />
+            </div>
+            {authError && <p className="login-error" role="alert">{authError}</p>}
+            <button className="primary-button" type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Signing in…" : "Sign in securely"}
+            </button>
+          </form>
+          <p className="login-footnote">Protected customer information · Authorized shop use only</p>
+        </section>
+      </div>
     </main>
   );
 }
@@ -732,10 +754,13 @@ function App() {
     <>
     <div className="app-shell">
       <header className="shop-header">
-        <div>
-          <p className="shop-kicker">Spectacles · Contact Lenses · Goggles</p>
-          <h1>Eye Centre Optics</h1>
-          <p>Shop No. 31, Sector 8, Panchkula — 134109, Haryana, India</p>
+        <div className="shop-identity">
+          <div className="brand-mark brand-mark-header" aria-hidden="true"><span /></div>
+          <div>
+            <p className="shop-kicker">Spectacles · Contact Lenses · Goggles</p>
+            <h1>Eye Centre Optics</h1>
+            <p>Shop No. 31, Sector 8, Panchkula — 134109, Haryana, India</p>
+          </div>
         </div>
         <div className="account-controls">
           <p>{session.user.email}</p>
