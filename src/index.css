@@ -90,6 +90,8 @@ button {
 .secondary-button:focus-visible,
 .open-record-button:focus-visible,
 .delete-record-button:focus-visible,
+.print-record-button:focus-visible,
+.export-button:focus-visible,
 .primary-button:focus-visible {
   outline: 3px solid rgb(38 113 93 / 30%);
   outline-offset: 2px;
@@ -452,6 +454,26 @@ button {
   align-items: center;
 }
 
+.records-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.export-button {
+  padding: 9px 14px;
+  border: 1px solid #8ea49a;
+  border-radius: 7px;
+  color: #17634f;
+  background: #fff;
+  font-weight: 750;
+}
+
+.export-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .records-list {
   display: grid;
   gap: 12px;
@@ -537,6 +559,25 @@ button {
   font-weight: 750;
 }
 
+.print-record-button {
+  min-width: 88px;
+  padding: 8px 15px;
+  border: 1px solid #8ea49a;
+  border-radius: 7px;
+  color: #29443a;
+  background: #fff;
+  font-weight: 750;
+}
+
+.print-record-button:hover {
+  border-color: #17634f;
+  background: #edf5f1;
+}
+
+.print-prescription {
+  display: none;
+}
+
 .delete-record-button:hover {
   border-color: #a42f2f;
   background: #fff4f4;
@@ -563,6 +604,12 @@ button {
   }
 
   .section-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .records-heading-actions {
     align-items: flex-start;
     flex-direction: column;
     gap: 8px;
@@ -611,6 +658,123 @@ button {
   .primary-button,
   .secondary-button {
     width: 100%;
+  }
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+
+  :root,
+  body {
+    color: #000;
+    background: #fff;
+  }
+
+  .app-shell {
+    display: none;
+  }
+
+  .print-prescription {
+    display: block;
+    color: #111;
+    font-family: Arial, sans-serif;
+    font-size: 10pt;
+  }
+
+  .print-header {
+    display: grid;
+    grid-template-columns: 1fr 1.2fr;
+    gap: 20px;
+    align-items: end;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #123f33;
+  }
+
+  .print-header h1 {
+    margin: 0 0 3px;
+    color: #123f33;
+    font-size: 24pt;
+  }
+
+  .print-header p,
+  .print-shop-details p {
+    margin: 2px 0;
+  }
+
+  .print-shop-details {
+    text-align: right;
+  }
+
+  .print-customer-grid,
+  .print-test-details,
+  .print-order-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 20px;
+    margin: 16px 0;
+  }
+
+  .print-customer-grid > div,
+  .print-test-details p,
+  .print-order-grid p {
+    margin: 0;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #ddd;
+  }
+
+  .print-prescription span {
+    display: block;
+    color: #555;
+    font-size: 8pt;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .print-wide {
+    grid-column: 1 / -1;
+  }
+
+  .print-prescription h2 {
+    margin: 16px 0 7px;
+    color: #123f33;
+    font-size: 13pt;
+  }
+
+  .print-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .print-table th,
+  .print-table td {
+    padding: 7px;
+    border: 1px solid #777;
+    text-align: center;
+  }
+
+  .print-table th {
+    background: #edf3f0;
+  }
+
+  .print-order {
+    break-inside: avoid;
+  }
+
+  .print-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-top: 28px;
+  }
+
+  .signature-line {
+    min-width: 180px;
+    padding-top: 6px;
+    border-top: 1px solid #333;
+    text-align: center;
   }
 }
 

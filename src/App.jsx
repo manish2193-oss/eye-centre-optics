@@ -118,6 +118,98 @@ function formatPower(value) {
   return `${numericValue >= 0 ? "+" : ""}${numericValue.toFixed(2)}`;
 }
 
+function displayValue(value) {
+  return value || "—";
+}
+
+function csvValue(value) {
+  const text = String(value ?? "");
+  return `"${text.replaceAll('"', '""')}"`;
+}
+
+function PrintablePrescription({ record }) {
+  const prescription = record.prescription ?? createInitialPrescription();
+  const order = record.order ?? createInitialOrder();
+  const hasOrder = Object.values(order).some(Boolean);
+
+  return (
+    <article className="print-prescription">
+      <header className="print-header">
+        <div>
+          <h1>Eye Centre Optics</h1>
+          <p>Spectacles · Contact Lenses · Goggles</p>
+        </div>
+        <div className="print-shop-details">
+          <p>Shop No. 31, Sector 8, Panchkula — 134109, Haryana, India</p>
+          <p>Open all days · 10:00 am to 9:00 pm</p>
+          <p>anilgupta.eyecentre@gmail.com</p>
+        </div>
+      </header>
+
+      <section className="print-customer-grid">
+        <div><span>Record number</span><strong>{record.recordNumber}</strong></div>
+        <div><span>Customer</span><strong>{record.customer.fullName}</strong></div>
+        <div><span>Age / Sex</span><strong>{displayValue([record.customer.age, record.customer.sex].filter(Boolean).join(" / "))}</strong></div>
+        <div><span>Phone</span><strong>{displayValue(record.customer.phone)}</strong></div>
+        <div className="print-wide"><span>Address</span><strong>{record.customer.address}</strong></div>
+        <div className="print-wide"><span>Complaints</span><strong>{displayValue(record.customer.complaints)}</strong></div>
+      </section>
+
+      <h2>Optical Prescription</h2>
+      <table className="print-table">
+        <thead>
+          <tr><th>Type</th><th>Eye</th><th>Sph</th><th>Cyl</th><th>Axis</th><th>VA</th></tr>
+        </thead>
+        <tbody>
+          {[
+            ["distance", "Distance"],
+            ["nearAdd", "Near Add"],
+          ].flatMap(([section, label]) => [
+            ["od", "Right / OD"],
+            ["os", "Left / OS"],
+          ].map(([eye, eyeLabel], index) => (
+            <tr key={`${section}-${eye}`}>
+              {index === 0 && <th rowSpan="2">{label}</th>}
+              <th>{eyeLabel}</th>
+              <td>{displayValue(prescription[section][eye].sph)}</td>
+              <td>{displayValue(prescription[section][eye].cyl)}</td>
+              <td>{displayValue(prescription[section][eye].axis)}</td>
+              <td>{displayValue(prescription[section][eye].va)}</td>
+            </tr>
+          ))) }
+        </tbody>
+      </table>
+
+      <section className="print-test-details">
+        <p><span>PD (mm)</span><strong>{displayValue(prescription.pd)}</strong></p>
+        <p><span>Tested by</span><strong>{displayValue(prescription.testedBy)}</strong></p>
+        <p><span>Test recorded on</span><strong>{displayValue(prescription.testRecordedOn)}</strong></p>
+        <p><span>Next review</span><strong>{displayValue(prescription.nextReview)}</strong></p>
+        <p className="print-wide"><span>Remarks / advice</span><strong>{displayValue(prescription.remarks)}</strong></p>
+      </section>
+
+      {hasOrder && (
+        <section className="print-order">
+          <h2>Order Information</h2>
+          <div className="print-order-grid">
+            <p><span>Frame</span><strong>{displayValue(order.frame)}</strong></p>
+            <p><span>Lens type</span><strong>{displayValue(order.lensType)}</strong></p>
+            <p><span>Total</span><strong>₹{Number(order.total || 0).toFixed(2)}</strong></p>
+            <p><span>Advance</span><strong>₹{Number(order.advance || 0).toFixed(2)}</strong></p>
+            <p><span>Balance</span><strong>₹{calculateBalance(order.total, order.advance)}</strong></p>
+            <p><span>Delivery date</span><strong>{displayValue(order.deliveryDate)}</strong></p>
+          </div>
+        </section>
+      )}
+
+      <footer className="print-footer">
+        <p>Review date: <strong>{displayValue(prescription.nextReview)}</strong></p>
+        <div className="signature-line">Authorized signature</div>
+      </footer>
+    </article>
+  );
+}
+
 function App() {
   const [records, setRecords] = useState(loadRecords);
   const [activeTab, setActiveTab] = useState("new");
@@ -131,6 +223,7 @@ function App() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [printRecord, setPrintRecord] = useState(null);
 
   const normalizedSearch = searchQuery.trim().toLowerCase();
   const filteredRecords = records.filter((record) => (
@@ -389,7 +482,52 @@ function App() {
     }
   }
 
+  function handlePrintRecord(record) {
+    setPrintRecord(record);
+    window.setTimeout(() => window.print(), 0);
+  }
+
+  function handleExportCsv() {
+    const headers = [
+      "Record Number", "Created At", "Updated At", "Full Name", "Age", "Sex", "Phone",
+      "Address", "Complaints", "Distance OD Sph", "Distance OD Cyl", "Distance OD Axis",
+      "Distance OD VA", "Distance OS Sph", "Distance OS Cyl", "Distance OS Axis", "Distance OS VA",
+      "Near OD Sph", "Near OD Cyl", "Near OD Axis", "Near OD VA", "Near OS Sph", "Near OS Cyl",
+      "Near OS Axis", "Near OS VA", "PD (mm)", "Tested By", "Remarks / Advice", "Next Review",
+      "Test Recorded On", "Frame", "Lens Type", "Total", "Advance", "Balance", "Delivery Date",
+    ];
+    const rows = records.map((record) => {
+      const prescription = record.prescription ?? createInitialPrescription();
+      const order = record.order ?? createInitialOrder();
+      return [
+        record.recordNumber, record.createdAt, record.updatedAt, record.customer.fullName,
+        record.customer.age, record.customer.sex, record.customer.phone, record.customer.address,
+        record.customer.complaints, prescription.distance.od.sph, prescription.distance.od.cyl,
+        prescription.distance.od.axis, prescription.distance.od.va, prescription.distance.os.sph,
+        prescription.distance.os.cyl, prescription.distance.os.axis, prescription.distance.os.va,
+        prescription.nearAdd.od.sph, prescription.nearAdd.od.cyl, prescription.nearAdd.od.axis,
+        prescription.nearAdd.od.va, prescription.nearAdd.os.sph, prescription.nearAdd.os.cyl,
+        prescription.nearAdd.os.axis, prescription.nearAdd.os.va, prescription.pd,
+        prescription.testedBy, prescription.remarks, prescription.nextReview,
+        prescription.testRecordedOn, order.frame, order.lensType, order.total, order.advance,
+        calculateBalance(order.total, order.advance), order.deliveryDate,
+      ];
+    });
+    const csv = [headers, ...rows]
+      .map((row) => row.map(csvValue).join(","))
+      .join("\r\n");
+    const blob = new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" });
+    const downloadUrl = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = downloadUrl;
+    link.download = `eye-centre-optics-backup-${getLocalDate()}.csv`;
+    link.click();
+    URL.revokeObjectURL(downloadUrl);
+  }
+
   return (
+    <>
     <div className="app-shell">
       <header className="shop-header">
         <p className="shop-kicker">Spectacles · Contact Lenses · Goggles</p>
@@ -817,11 +955,21 @@ function App() {
                 <p className="eyebrow">Records</p>
                 <h2 id="records-heading">Saved customer records</h2>
               </div>
-              <p>
-                {normalizedSearch
-                  ? `${filteredRecords.length} of ${records.length} records`
-                  : `${records.length} ${records.length === 1 ? "record" : "records"}`}
-              </p>
+              <div className="records-heading-actions">
+                <p>
+                  {normalizedSearch
+                    ? `${filteredRecords.length} of ${records.length} records`
+                    : `${records.length} ${records.length === 1 ? "record" : "records"}`}
+                </p>
+                <button
+                  className="export-button"
+                  type="button"
+                  onClick={handleExportCsv}
+                  disabled={records.length === 0}
+                >
+                  Export CSV
+                </button>
+              </div>
             </div>
 
             {records.length === 0 ? (
@@ -869,6 +1017,13 @@ function App() {
                             Open
                           </button>
                           <button
+                            className="print-record-button"
+                            type="button"
+                            onClick={() => handlePrintRecord(record)}
+                          >
+                            Print
+                          </button>
+                          <button
                             className="delete-record-button"
                             type="button"
                             onClick={() => handleDeleteRecord(record)}
@@ -887,6 +1042,8 @@ function App() {
         )}
       </main>
     </div>
+    {printRecord && <PrintablePrescription record={printRecord} />}
+    </>
   );
 }
 
