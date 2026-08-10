@@ -1,5 +1,7 @@
 import { useState } from "react";
 
+const STORAGE_KEY = "eye-centre-optics-records";
+
 const initialCustomer = {
   fullName: "",
   age: "",
@@ -9,18 +11,64 @@ const initialCustomer = {
   complaints: "",
 };
 
+function formatRecordNumber(sequence) {
+  return `ECO-${String(sequence).padStart(4, "0")}`;
+}
+
+function loadRecords() {
+  try {
+    const storedRecords = localStorage.getItem(STORAGE_KEY);
+    const parsedRecords = storedRecords ? JSON.parse(storedRecords) : [];
+    return Array.isArray(parsedRecords) ? parsedRecords : [];
+  } catch {
+    return [];
+  }
+}
+
+function getNextSequence(records) {
+  const highestSequence = records.reduce((highest, record) => {
+    const sequence = Number(record.recordNumber?.replace("ECO-", ""));
+    return Number.isFinite(sequence) ? Math.max(highest, sequence) : highest;
+  }, 0);
+
+  return highestSequence + 1;
+}
+
+function createRecordMetadata(sequence) {
+  const startedAt = new Date().toISOString();
+
+  return {
+    recordNumber: formatRecordNumber(sequence),
+    createdAt: startedAt,
+    updatedAt: startedAt,
+  };
+}
+
+function formatDateTime(timestamp) {
+  return new Intl.DateTimeFormat("en-IN", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(timestamp));
+}
+
 function App() {
+  const [records, setRecords] = useState(loadRecords);
   const [activeTab, setActiveTab] = useState("new");
+  const [recordSequence, setRecordSequence] = useState(() => getNextSequence(records));
+  const [metadata, setMetadata] = useState(() => createRecordMetadata(getNextSequence(records)));
   const [customer, setCustomer] = useState(initialCustomer);
   const [errors, setErrors] = useState({});
-  const [isReady, setIsReady] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
+  const [storageError, setStorageError] = useState("");
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   function handleChange(event) {
     const { name, value } = event.target;
+    const nextValue = name === "phone" ? value.replace(/\D/g, "") : value;
 
     setCustomer((currentCustomer) => ({
       ...currentCustomer,
-      [name]: value,
+      [name]: nextValue,
     }));
 
     if (errors[name]) {
@@ -30,7 +78,9 @@ function App() {
       }));
     }
 
-    setIsReady(false);
+    setSaveMessage("");
+    setStorageError("");
+    setHasUnsavedChanges(true);
   }
 
   function handleSubmit(event) {
@@ -46,8 +96,70 @@ function App() {
       nextErrors.address = "Please enter the customer's address.";
     }
 
+    const formIsValid = Object.keys(nextErrors).length === 0;
+
     setErrors(nextErrors);
-    setIsReady(Object.keys(nextErrors).length === 0);
+
+    if (formIsValid) {
+      const savedMetadata = {
+        ...metadata,
+        updatedAt: new Date().toISOString(),
+      };
+      const savedRecord = {
+        ...savedMetadata,
+        customer: {
+          ...customer,
+          fullName: customer.fullName.trim(),
+          address: customer.address.trim(),
+        },
+      };
+      const existingRecordIndex = records.findIndex(
+        (record) => record.recordNumber === savedRecord.recordNumber,
+      );
+      const nextRecords = [...records];
+
+      if (existingRecordIndex >= 0) {
+        nextRecords[existingRecordIndex] = savedRecord;
+      } else {
+        nextRecords.push(savedRecord);
+      }
+
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(nextRecords));
+        setRecords(nextRecords);
+        setMetadata(savedMetadata);
+        setCustomer(savedRecord.customer);
+        setSaveMessage(`${savedRecord.recordNumber} saved successfully.`);
+        setStorageError("");
+        setHasUnsavedChanges(false);
+      } catch {
+        setStorageError("The record could not be saved in this browser. Please try again.");
+        setSaveMessage("");
+      }
+    }
+  }
+
+  function handleStartNewRecord() {
+    if (hasUnsavedChanges) {
+      const shouldDiscard = window.confirm(
+        "This record has unsaved changes. Start a new record and discard them?",
+      );
+
+      if (!shouldDiscard) {
+        return;
+      }
+    }
+
+    const nextSequence = Math.max(recordSequence + 1, getNextSequence(records));
+
+    setRecordSequence(nextSequence);
+    setMetadata(createRecordMetadata(nextSequence));
+    setCustomer(initialCustomer);
+    setErrors({});
+    setSaveMessage("");
+    setStorageError("");
+    setHasUnsavedChanges(false);
+    setActiveTab("new");
   }
 
   return (
@@ -87,6 +199,21 @@ function App() {
               </div>
               <p><span aria-hidden="true">*</span> Required fields</p>
             </div>
+
+            <dl className="record-metadata" aria-label="Record information">
+              <div>
+                <dt>Record number</dt>
+                <dd>{metadata.recordNumber}</dd>
+              </div>
+              <div>
+                <dt>Created</dt>
+                <dd>{formatDateTime(metadata.createdAt)}</dd>
+              </div>
+              <div>
+                <dt>Last updated</dt>
+                <dd>{formatDateTime(metadata.updatedAt)}</dd>
+              </div>
+            </dl>
 
             <form onSubmit={handleSubmit} noValidate>
               <div className="form-grid">
@@ -140,7 +267,8 @@ function App() {
                     value={customer.phone}
                     onChange={handleChange}
                     autoComplete="tel"
-                    inputMode="tel"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                   />
                 </div>
 
@@ -175,22 +303,61 @@ function App() {
               </div>
 
               <div className="form-actions">
-                {isReady && (
-                  <p className="success-message" role="status">
-                    Customer details are complete. Prescription entry will be added next.
-                  </p>
-                )}
-                <button className="primary-button" type="submit">Continue</button>
+                <div className="form-status" aria-live="polite">
+                  {saveMessage && (
+                    <p className="success-message" role="status">
+                      {saveMessage}
+                    </p>
+                  )}
+                  {storageError && <p className="storage-error">{storageError}</p>}
+                </div>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  onClick={handleStartNewRecord}
+                >
+                  Start New Record
+                </button>
+                <button className="primary-button" type="submit">Save Record</button>
               </div>
             </form>
           </section>
         )}
 
         {activeTab === "records" && (
-          <section className="empty-state">
-            <p className="eyebrow">Records</p>
-            <h2>Saved customer records</h2>
-            <p>No records yet — saved eye tests will appear here.</p>
+          <section aria-labelledby="records-heading">
+            <div className="section-heading records-heading">
+              <div>
+                <p className="eyebrow">Records</p>
+                <h2 id="records-heading">Saved customer records</h2>
+              </div>
+              <p>{records.length} {records.length === 1 ? "record" : "records"}</p>
+            </div>
+
+            {records.length === 0 ? (
+              <div className="empty-state">
+                <p>No records yet — saved customer records will appear here.</p>
+              </div>
+            ) : (
+              <div className="records-list">
+                {records
+                  .slice()
+                  .reverse()
+                  .map((record) => (
+                    <article className="record-card" key={record.recordNumber}>
+                      <div>
+                        <p className="record-number">{record.recordNumber}</p>
+                        <h3>{record.customer.fullName}</h3>
+                        <p>{record.customer.phone || "No phone number"}</p>
+                      </div>
+                      <div className="record-card-details">
+                        <p>{record.customer.address}</p>
+                        <p>Created {formatDateTime(record.createdAt)}</p>
+                      </div>
+                    </article>
+                  ))}
+              </div>
+            )}
           </section>
         )}
       </main>

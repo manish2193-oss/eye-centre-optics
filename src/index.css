@@ -87,6 +87,7 @@ button {
 }
 
 .tab:focus-visible,
+.secondary-button:focus-visible,
 .primary-button:focus-visible {
   outline: 3px solid rgb(38 113 93 / 30%);
   outline-offset: 2px;
@@ -131,6 +132,38 @@ button {
 .section-heading span,
 .field label span {
   color: #b33a3a;
+}
+
+.record-metadata {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0 0 28px;
+  overflow: hidden;
+  border: 1px solid #dce4e0;
+  border-radius: 10px;
+  background: #dce4e0;
+}
+
+.record-metadata > div {
+  padding: 14px 16px;
+  background: #f6f8f7;
+}
+
+.record-metadata dt {
+  margin-bottom: 3px;
+  color: #69766f;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.record-metadata dd {
+  margin: 0;
+  color: #263b34;
+  font-size: 0.92rem;
+  font-weight: 700;
 }
 
 .form-grid {
@@ -206,9 +239,19 @@ button {
   border-top: 1px solid #e5ebe8;
 }
 
+.form-status {
+  margin-right: auto;
+}
+
 .success-message {
-  margin: 0 auto 0 0;
+  margin: 0;
   color: #23604f;
+  font-size: 0.9rem;
+}
+
+.storage-error {
+  margin: 0;
+  color: #a42f2f;
   font-size: 0.9rem;
 }
 
@@ -223,18 +266,80 @@ button {
   font-weight: 750;
 }
 
+.secondary-button {
+  min-height: 48px;
+  padding: 10px 18px;
+  border: 1px solid #aebdb6;
+  border-radius: 9px;
+  color: #29443a;
+  background: #fff;
+  font-weight: 700;
+}
+
+.secondary-button:hover {
+  border-color: #789489;
+  background: #f5f8f6;
+}
+
 .primary-button:hover {
   background: #104d3e;
 }
 
 .empty-state {
-  padding: 48px 24px;
+  padding: 48px 24px 32px;
   text-align: center;
 }
 
 .empty-state > p:last-child {
-  margin-top: 10px;
+  margin: 0;
   color: #69766f;
+}
+
+.records-heading {
+  align-items: center;
+}
+
+.records-list {
+  display: grid;
+  gap: 12px;
+}
+
+.record-card {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.8fr) minmax(0, 1.2fr);
+  gap: 24px;
+  padding: 18px 20px;
+  border: 1px solid #dce4e0;
+  border-radius: 10px;
+  background: #fbfcfb;
+}
+
+.record-card h3 {
+  margin: 3px 0;
+  color: #18231f;
+  font-size: 1.05rem;
+}
+
+.record-card p {
+  margin: 0;
+  color: #69766f;
+  font-size: 0.88rem;
+}
+
+.record-card .record-number {
+  color: #26715d;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.record-card-details {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  padding-left: 24px;
+  border-left: 1px solid #dce4e0;
 }
 
 @media (max-width: 700px) {
@@ -263,6 +368,10 @@ button {
     gap: 18px 14px;
   }
 
+  .record-metadata {
+    grid-template-columns: 1fr;
+  }
+
   .field-wide,
   .field-full {
     grid-column: 1 / -1;
@@ -273,7 +382,23 @@ button {
     flex-direction: column;
   }
 
-  .primary-button {
+  .form-status {
+    margin-right: 0;
+  }
+
+  .record-card {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .record-card-details {
+    padding: 12px 0 0;
+    border-top: 1px solid #dce4e0;
+    border-left: 0;
+  }
+
+  .primary-button,
+  .secondary-button {
     width: 100%;
   }
 }
