@@ -11,6 +11,34 @@ const initialCustomer = {
   complaints: "",
 };
 
+function createEmptyEyePrescription() {
+  return { sph: "", cyl: "", axis: "", va: "" };
+}
+
+function getLocalDate() {
+  const now = new Date();
+  const timezoneOffset = now.getTimezoneOffset() * 60_000;
+  return new Date(now.getTime() - timezoneOffset).toISOString().slice(0, 10);
+}
+
+function createInitialPrescription() {
+  return {
+    distance: {
+      od: createEmptyEyePrescription(),
+      os: createEmptyEyePrescription(),
+    },
+    nearAdd: {
+      od: createEmptyEyePrescription(),
+      os: createEmptyEyePrescription(),
+    },
+    pd: "",
+    testedBy: "",
+    remarks: "",
+    nextReview: "",
+    testRecordedOn: getLocalDate(),
+  };
+}
+
 function formatRecordNumber(sequence) {
   return `ECO-${String(sequence).padStart(4, "0")}`;
 }
@@ -51,16 +79,61 @@ function formatDateTime(timestamp) {
   }).format(new Date(timestamp));
 }
 
+function formatPower(value) {
+  if (value.trim() === "") {
+    return "";
+  }
+
+  const numericValue = Number(value);
+
+  if (!Number.isFinite(numericValue)) {
+    return value;
+  }
+
+  return `${numericValue >= 0 ? "+" : ""}${numericValue.toFixed(2)}`;
+}
+
 function App() {
   const [records, setRecords] = useState(loadRecords);
   const [activeTab, setActiveTab] = useState("new");
-  const [recordSequence, setRecordSequence] = useState(() => getNextSequence(records));
   const [metadata, setMetadata] = useState(() => createRecordMetadata(getNextSequence(records)));
   const [customer, setCustomer] = useState(initialCustomer);
+  const [prescription, setPrescription] = useState(createInitialPrescription);
   const [errors, setErrors] = useState({});
   const [saveMessage, setSaveMessage] = useState("");
   const [storageError, setStorageError] = useState("");
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+
+  function confirmDiscardChanges() {
+    return !hasUnsavedChanges || window.confirm(
+      "This record has unsaved changes. Discard them?",
+    );
+  }
+
+  function resetForm(sequence) {
+    setMetadata(createRecordMetadata(sequence));
+    setCustomer(initialCustomer);
+    setPrescription(createInitialPrescription());
+    setErrors({});
+    setSaveMessage("");
+    setStorageError("");
+    setHasUnsavedChanges(false);
+    setIsEditing(false);
+  }
+
+  function handleTabChange(nextTab) {
+    if (nextTab === activeTab) {
+      return;
+    }
+
+    if (activeTab === "new" && !confirmDiscardChanges()) {
+      return;
+    }
+
+    resetForm(getNextSequence(records));
+    setActiveTab(nextTab);
+  }
 
   function handleChange(event) {
     const { name, value } = event.target;
@@ -112,6 +185,7 @@ function App() {
           fullName: customer.fullName.trim(),
           address: customer.address.trim(),
         },
+        prescription,
       };
       const existingRecordIndex = records.findIndex(
         (record) => record.recordNumber === savedRecord.recordNumber,
@@ -132,6 +206,7 @@ function App() {
         setSaveMessage(`${savedRecord.recordNumber} saved successfully.`);
         setStorageError("");
         setHasUnsavedChanges(false);
+        setIsEditing(true);
       } catch {
         setStorageError("The record could not be saved in this browser. Please try again.");
         setSaveMessage("");
@@ -139,27 +214,103 @@ function App() {
     }
   }
 
-  function handleStartNewRecord() {
-    if (hasUnsavedChanges) {
-      const shouldDiscard = window.confirm(
-        "This record has unsaved changes. Start a new record and discard them?",
-      );
+  function handlePrescriptionChange(event) {
+    const { name, value } = event.target;
 
-      if (!shouldDiscard) {
-        return;
-      }
+    setPrescription((currentPrescription) => ({
+      ...currentPrescription,
+      [name]: value,
+    }));
+    setSaveMessage("");
+    setStorageError("");
+    setHasUnsavedChanges(true);
+  }
+
+  function handleEyePrescriptionChange(section, eye, field, value) {
+    setPrescription((currentPrescription) => ({
+      ...currentPrescription,
+      [section]: {
+        ...currentPrescription[section],
+        [eye]: {
+          ...currentPrescription[section][eye],
+          [field]: value,
+        },
+      },
+    }));
+    setSaveMessage("");
+    setStorageError("");
+    setHasUnsavedChanges(true);
+  }
+
+  function handlePowerBlur(section, eye, field) {
+    setPrescription((currentPrescription) => ({
+      ...currentPrescription,
+      [section]: {
+        ...currentPrescription[section],
+        [eye]: {
+          ...currentPrescription[section][eye],
+          [field]: formatPower(currentPrescription[section][eye][field]),
+        },
+      },
+    }));
+  }
+
+  function handlePowerStep(section, eye, field, change) {
+    setPrescription((currentPrescription) => {
+      const currentValue = Number(currentPrescription[section][eye][field]);
+      const startingValue = Number.isFinite(currentValue) ? currentValue : 0;
+      const nextValue = startingValue + change;
+
+      return {
+        ...currentPrescription,
+        [section]: {
+          ...currentPrescription[section],
+          [eye]: {
+            ...currentPrescription[section][eye],
+            [field]: formatPower(nextValue.toString()),
+          },
+        },
+      };
+    });
+    setSaveMessage("");
+    setStorageError("");
+    setHasUnsavedChanges(true);
+  }
+
+  function handleStartNewRecord() {
+    if (!confirmDiscardChanges()) {
+      return;
     }
 
-    const nextSequence = Math.max(recordSequence + 1, getNextSequence(records));
+    const nextSequence = getNextSequence(records);
 
-    setRecordSequence(nextSequence);
-    setMetadata(createRecordMetadata(nextSequence));
-    setCustomer(initialCustomer);
+    resetForm(nextSequence);
+    setActiveTab("new");
+  }
+
+  function handleOpenRecord(record) {
+    setMetadata({
+      recordNumber: record.recordNumber,
+      createdAt: record.createdAt,
+      updatedAt: record.updatedAt,
+    });
+    setCustomer(record.customer);
+    setPrescription(record.prescription ?? createInitialPrescription());
     setErrors({});
     setSaveMessage("");
     setStorageError("");
     setHasUnsavedChanges(false);
+    setIsEditing(true);
     setActiveTab("new");
+  }
+
+  function handleCancelEdit() {
+    if (!confirmDiscardChanges()) {
+      return;
+    }
+
+    resetForm(getNextSequence(records));
+    setActiveTab("records");
   }
 
   return (
@@ -175,7 +326,7 @@ function App() {
           className={activeTab === "new" ? "tab active" : "tab"}
           type="button"
           aria-pressed={activeTab === "new"}
-          onClick={() => setActiveTab("new")}
+          onClick={() => handleTabChange("new")}
         >
           New Record
         </button>
@@ -183,7 +334,7 @@ function App() {
           className={activeTab === "records" ? "tab active" : "tab"}
           type="button"
           aria-pressed={activeTab === "records"}
-          onClick={() => setActiveTab("records")}
+          onClick={() => handleTabChange("records")}
         >
           Records
         </button>
@@ -194,7 +345,7 @@ function App() {
           <section aria-labelledby="customer-heading">
             <div className="section-heading">
               <div>
-                <p className="eyebrow">New Record</p>
+                <p className="eyebrow">{isEditing ? "Edit Record" : "New Record"}</p>
                 <h2 id="customer-heading">Customer details</h2>
               </div>
               <p><span aria-hidden="true">*</span> Required fields</p>
@@ -302,6 +453,173 @@ function App() {
                 </div>
               </div>
 
+              <section className="prescription-section" aria-labelledby="prescription-heading">
+                <div className="subsection-heading">
+                  <div>
+                    <p className="eyebrow">Eye Test</p>
+                    <h2 id="prescription-heading">Optical prescription</h2>
+                  </div>
+                  <p>Power is formatted when you leave the field.</p>
+                </div>
+
+                <div className="prescription-table-wrap">
+                  <table className="prescription-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">Type</th>
+                        <th scope="col">Eye</th>
+                        <th scope="col">Sph</th>
+                        <th scope="col">Cyl</th>
+                        <th scope="col">Axis</th>
+                        <th scope="col">VA</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[
+                        ["distance", "Distance"],
+                        ["nearAdd", "Near Add"],
+                      ].flatMap(([section, sectionLabel]) => (
+                        [
+                          ["od", "Right / OD"],
+                          ["os", "Left / OS"],
+                        ].map(([eye, eyeLabel], eyeIndex) => (
+                          <tr key={`${section}-${eye}`}>
+                            {eyeIndex === 0 && <th scope="rowgroup" rowSpan="2">{sectionLabel}</th>}
+                            <th scope="row">{eyeLabel}</th>
+                            {(["sph", "cyl"]).map((field) => (
+                              <td key={field}>
+                                <div className="power-control">
+                                  <button
+                                    type="button"
+                                    aria-label={`Subtract 0.25 from ${sectionLabel} ${eyeLabel} ${field}`}
+                                    onClick={() => handlePowerStep(section, eye, field, -0.25)}
+                                  >
+                                    −
+                                  </button>
+                                  <input
+                                    id={`${section}-${eye}-${field}`}
+                                    aria-label={`${sectionLabel} ${eyeLabel} ${field}`}
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={prescription[section][eye][field]}
+                                    onChange={(event) => handleEyePrescriptionChange(
+                                      section,
+                                      eye,
+                                      field,
+                                      event.target.value,
+                                    )}
+                                    onBlur={() => handlePowerBlur(section, eye, field)}
+                                    placeholder="+0.00"
+                                  />
+                                  <button
+                                    type="button"
+                                    aria-label={`Add 0.25 to ${sectionLabel} ${eyeLabel} ${field}`}
+                                    onClick={() => handlePowerStep(section, eye, field, 0.25)}
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              </td>
+                            ))}
+                            <td>
+                              <input
+                                id={`${section}-${eye}-axis`}
+                                aria-label={`${sectionLabel} ${eyeLabel} axis`}
+                                type="number"
+                                min="0"
+                                max="180"
+                                inputMode="numeric"
+                                value={prescription[section][eye].axis}
+                                onChange={(event) => handleEyePrescriptionChange(
+                                  section,
+                                  eye,
+                                  "axis",
+                                  event.target.value,
+                                )}
+                              />
+                            </td>
+                            <td>
+                              <input
+                                id={`${section}-${eye}-va`}
+                                aria-label={`${sectionLabel} ${eyeLabel} visual acuity`}
+                                type="text"
+                                value={prescription[section][eye].va}
+                                onChange={(event) => handleEyePrescriptionChange(
+                                  section,
+                                  eye,
+                                  "va",
+                                  event.target.value,
+                                )}
+                              />
+                            </td>
+                          </tr>
+                        ))
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="form-grid prescription-details">
+                  <div className="field">
+                    <label htmlFor="pd">PD (mm)</label>
+                    <input
+                      id="pd"
+                      name="pd"
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      inputMode="decimal"
+                      value={prescription.pd}
+                      onChange={handlePrescriptionChange}
+                    />
+                  </div>
+
+                  <div className="field field-wide">
+                    <label htmlFor="testedBy">Tested by</label>
+                    <input
+                      id="testedBy"
+                      name="testedBy"
+                      type="text"
+                      value={prescription.testedBy}
+                      onChange={handlePrescriptionChange}
+                    />
+                  </div>
+
+                  <div className="field">
+                    <label htmlFor="testRecordedOn">Test recorded on</label>
+                    <input
+                      id="testRecordedOn"
+                      name="testRecordedOn"
+                      type="date"
+                      value={prescription.testRecordedOn}
+                      onChange={handlePrescriptionChange}
+                    />
+                  </div>
+
+                  <div className="field field-wide">
+                    <label htmlFor="nextReview">Next review</label>
+                    <input
+                      id="nextReview"
+                      name="nextReview"
+                      type="date"
+                      value={prescription.nextReview}
+                      onChange={handlePrescriptionChange}
+                    />
+                  </div>
+
+                  <div className="field field-full">
+                    <label htmlFor="remarks">Remarks / advice</label>
+                    <textarea
+                      id="remarks"
+                      name="remarks"
+                      rows="3"
+                      value={prescription.remarks}
+                      onChange={handlePrescriptionChange}
+                    />
+                  </div>
+                </div>
+              </section>
+
               <div className="form-actions">
                 <div className="form-status" aria-live="polite">
                   {saveMessage && (
@@ -318,6 +636,15 @@ function App() {
                 >
                   Start New Record
                 </button>
+                {isEditing && (
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    onClick={handleCancelEdit}
+                  >
+                    Cancel Edit
+                  </button>
+                )}
                 <button className="primary-button" type="submit">Save Record</button>
               </div>
             </form>
@@ -353,6 +680,13 @@ function App() {
                       <div className="record-card-details">
                         <p>{record.customer.address}</p>
                         <p>Created {formatDateTime(record.createdAt)}</p>
+                        <button
+                          className="open-record-button"
+                          type="button"
+                          onClick={() => handleOpenRecord(record)}
+                        >
+                          Open
+                        </button>
                       </div>
                     </article>
                   ))}

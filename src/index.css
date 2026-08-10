@@ -88,6 +88,7 @@ button {
 
 .tab:focus-visible,
 .secondary-button:focus-visible,
+.open-record-button:focus-visible,
 .primary-button:focus-visible {
   outline: 3px solid rgb(38 113 93 / 30%);
   outline-offset: 2px;
@@ -229,6 +230,145 @@ button {
   font-size: 0.84rem;
 }
 
+.prescription-section {
+  min-width: 0;
+  margin-top: 36px;
+  padding-top: 32px;
+  border-top: 1px solid #dce4e0;
+}
+
+.subsection-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 20px;
+}
+
+.subsection-heading h2 {
+  margin: 4px 0 0;
+  color: #18231f;
+  font-size: 1.35rem;
+}
+
+.subsection-heading p {
+  margin: 0;
+}
+
+.subsection-heading > p {
+  color: #69766f;
+  font-size: 0.82rem;
+}
+
+.prescription-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid #d5dfda;
+  border-radius: 10px;
+}
+
+.prescription-table {
+  width: 100%;
+  min-width: 680px;
+  border-collapse: collapse;
+}
+
+.prescription-table th,
+.prescription-table td {
+  padding: 10px;
+  border-right: 1px solid #e0e7e3;
+  border-bottom: 1px solid #e0e7e3;
+  text-align: left;
+}
+
+.prescription-table tr:last-child th,
+.prescription-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.prescription-table th:last-child,
+.prescription-table td:last-child {
+  border-right: 0;
+}
+
+.prescription-table thead th {
+  color: #52605a;
+  background: #f0f4f2;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.prescription-table tbody th {
+  color: #29443a;
+  background: #fafcfb;
+  font-size: 0.86rem;
+}
+
+.prescription-table input {
+  width: 100%;
+  min-width: 78px;
+  height: 42px;
+  padding: 8px;
+  border: 1px solid #bdcbc5;
+  border-radius: 7px;
+  color: #18231f;
+  background: #fff;
+}
+
+.power-control {
+  display: grid;
+  grid-template-columns: 36px minmax(78px, 1fr) 36px;
+  align-items: stretch;
+}
+
+.power-control input {
+  min-width: 78px;
+  border-radius: 0;
+  text-align: center;
+}
+
+.power-control button {
+  min-width: 36px;
+  padding: 0;
+  border: 1px solid #bdcbc5;
+  color: #17634f;
+  background: #f4f8f6;
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+
+.power-control button:first-child {
+  border-right: 0;
+  border-radius: 7px 0 0 7px;
+}
+
+.power-control button:last-child {
+  border-left: 0;
+  border-radius: 0 7px 7px 0;
+}
+
+.power-control button:hover {
+  background: #e6f0eb;
+}
+
+.power-control button:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 3px solid rgb(38 113 93 / 22%);
+  outline-offset: 0;
+}
+
+.prescription-table input:focus {
+  border-color: #26715d;
+  outline: none;
+  box-shadow: 0 0 0 3px rgb(38 113 93 / 14%);
+}
+
+.prescription-details {
+  margin-top: 24px;
+}
+
 .form-actions {
   display: flex;
   align-items: center;
@@ -342,6 +482,23 @@ button {
   border-left: 1px solid #dce4e0;
 }
 
+.open-record-button {
+  align-self: flex-start;
+  min-width: 88px;
+  margin-top: 8px;
+  padding: 8px 15px;
+  border: 1px solid #8ea49a;
+  border-radius: 7px;
+  color: #17634f;
+  background: #fff;
+  font-weight: 750;
+}
+
+.open-record-button:hover {
+  border-color: #17634f;
+  background: #edf5f1;
+}
+
 @media (max-width: 700px) {
   .app-shell {
     width: min(100% - 20px, 960px);
@@ -358,6 +515,12 @@ button {
   }
 
   .section-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .subsection-heading {
     align-items: flex-start;
     flex-direction: column;
     gap: 8px;
