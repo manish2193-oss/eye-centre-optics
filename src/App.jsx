@@ -39,6 +39,22 @@ function createInitialPrescription() {
   };
 }
 
+function createInitialOrder() {
+  return {
+    frame: "",
+    lensType: "",
+    total: "",
+    advance: "",
+    deliveryDate: "",
+  };
+}
+
+function calculateBalance(total, advance) {
+  const totalAmount = Number(total) || 0;
+  const advanceAmount = Number(advance) || 0;
+  return (totalAmount - advanceAmount).toFixed(2);
+}
+
 function formatRecordNumber(sequence) {
   return `ECO-${String(sequence).padStart(4, "0")}`;
 }
@@ -99,6 +115,7 @@ function App() {
   const [metadata, setMetadata] = useState(() => createRecordMetadata(getNextSequence(records)));
   const [customer, setCustomer] = useState(initialCustomer);
   const [prescription, setPrescription] = useState(createInitialPrescription);
+  const [order, setOrder] = useState(createInitialOrder);
   const [errors, setErrors] = useState({});
   const [saveMessage, setSaveMessage] = useState("");
   const [storageError, setStorageError] = useState("");
@@ -115,6 +132,7 @@ function App() {
     setMetadata(createRecordMetadata(sequence));
     setCustomer(initialCustomer);
     setPrescription(createInitialPrescription());
+    setOrder(createInitialOrder());
     setErrors({});
     setSaveMessage("");
     setStorageError("");
@@ -186,6 +204,7 @@ function App() {
           address: customer.address.trim(),
         },
         prescription,
+        order,
       };
       const existingRecordIndex = records.findIndex(
         (record) => record.recordNumber === savedRecord.recordNumber,
@@ -219,6 +238,18 @@ function App() {
 
     setPrescription((currentPrescription) => ({
       ...currentPrescription,
+      [name]: value,
+    }));
+    setSaveMessage("");
+    setStorageError("");
+    setHasUnsavedChanges(true);
+  }
+
+  function handleOrderChange(event) {
+    const { name, value } = event.target;
+
+    setOrder((currentOrder) => ({
+      ...currentOrder,
       [name]: value,
     }));
     setSaveMessage("");
@@ -296,6 +327,7 @@ function App() {
     });
     setCustomer(record.customer);
     setPrescription(record.prescription ?? createInitialPrescription());
+    setOrder(record.order ?? createInitialOrder());
     setErrors({});
     setSaveMessage("");
     setStorageError("");
@@ -615,6 +647,89 @@ function App() {
                       rows="3"
                       value={prescription.remarks}
                       onChange={handlePrescriptionChange}
+                    />
+                  </div>
+                </div>
+              </section>
+
+              <section className="order-section" aria-labelledby="order-heading">
+                <div className="subsection-heading">
+                  <div>
+                    <p className="eyebrow">Optional</p>
+                    <h2 id="order-heading">Order information</h2>
+                  </div>
+                  <p>Complete only when an order is placed.</p>
+                </div>
+
+                <div className="form-grid">
+                  <div className="field field-wide">
+                    <label htmlFor="frame">Frame</label>
+                    <input
+                      id="frame"
+                      name="frame"
+                      type="text"
+                      value={order.frame}
+                      onChange={handleOrderChange}
+                    />
+                  </div>
+
+                  <div className="field field-wide">
+                    <label htmlFor="lensType">Lens type</label>
+                    <input
+                      id="lensType"
+                      name="lensType"
+                      type="text"
+                      value={order.lensType}
+                      onChange={handleOrderChange}
+                    />
+                  </div>
+
+                  <div className="field">
+                    <label htmlFor="total">Total ₹</label>
+                    <input
+                      id="total"
+                      name="total"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      inputMode="decimal"
+                      value={order.total}
+                      onChange={handleOrderChange}
+                    />
+                  </div>
+
+                  <div className="field">
+                    <label htmlFor="advance">Advance ₹</label>
+                    <input
+                      id="advance"
+                      name="advance"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      inputMode="decimal"
+                      value={order.advance}
+                      onChange={handleOrderChange}
+                    />
+                  </div>
+
+                  <div className="field">
+                    <label htmlFor="balance">Balance ₹</label>
+                    <input
+                      id="balance"
+                      type="text"
+                      value={calculateBalance(order.total, order.advance)}
+                      readOnly
+                    />
+                  </div>
+
+                  <div className="field">
+                    <label htmlFor="deliveryDate">Delivery date</label>
+                    <input
+                      id="deliveryDate"
+                      name="deliveryDate"
+                      type="date"
+                      value={order.deliveryDate}
+                      onChange={handleOrderChange}
                     />
                   </div>
                 </div>

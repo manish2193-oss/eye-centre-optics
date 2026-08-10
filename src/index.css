@@ -237,6 +237,18 @@ button {
   border-top: 1px solid #dce4e0;
 }
 
+.order-section {
+  margin-top: 36px;
+  padding-top: 32px;
+  border-top: 1px solid #dce4e0;
+}
+
+.field input[readonly] {
+  color: #41534c;
+  background: #eef3f0;
+  cursor: default;
+}
+
 .subsection-heading {
   display: flex;
   align-items: flex-end;
