@@ -3,6 +3,12 @@ import { isSupabaseConfigured, supabase } from "./supabase";
 
 const STORAGE_KEY = "eye-centre-optics-records";
 const LAST_SEQUENCE_KEY = "eye-centre-optics-last-sequence";
+const SHOP_NAME = "Eye Centre";
+const SHOP_ADDRESS = "Shop No. 31, Sector 8, Panchkula — 134109, Haryana, India";
+const SHOP_PHONE = "0172-2561168";
+const SHOP_GSTIN = "06ABJPK3814GIZU";
+const SHOP_STATE_CODE = "06";
+const SHOP_EMAIL = "anilgupta.eyecentre@gmail.com";
 
 const initialCustomer = {
   fullName: "",
@@ -55,6 +61,54 @@ function calculateBalance(total, advance) {
   const totalAmount = Number(total) || 0;
   const advanceAmount = Number(advance) || 0;
   return (totalAmount - advanceAmount).toFixed(2);
+}
+
+function amountInWords(value) {
+  const ones = ["Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+  const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+  const number = Math.max(0, Number(value) || 0);
+  const rupees = Math.floor(number);
+  const paise = Math.round((number - rupees) * 100);
+
+  function belowThousand(amount) {
+    const words = [];
+    let remainder = amount;
+
+    if (remainder >= 100) {
+      words.push(`${ones[Math.floor(remainder / 100)]} Hundred`);
+      remainder %= 100;
+    }
+    if (remainder >= 20) {
+      words.push(tens[Math.floor(remainder / 10)]);
+      remainder %= 10;
+    }
+    if (remainder > 0) words.push(ones[remainder]);
+    return words.join(" ");
+  }
+
+  function integerWords(amount) {
+    if (amount === 0) return ones[0];
+
+    const parts = [];
+    const groups = [
+      [10_000_000, "Crore"],
+      [100_000, "Lakh"],
+      [1_000, "Thousand"],
+    ];
+    let remainder = amount;
+
+    groups.forEach(([size, label]) => {
+      if (remainder >= size) {
+        parts.push(`${belowThousand(Math.floor(remainder / size))} ${label}`);
+        remainder %= size;
+      }
+    });
+    if (remainder > 0) parts.push(belowThousand(remainder));
+    return parts.join(" ");
+  }
+
+  const paiseWords = paise ? ` and ${integerWords(paise)} Paise` : "";
+  return `${integerWords(rupees)} Rupees${paiseWords} Only`;
 }
 
 function loadLocalRecords() {
@@ -117,6 +171,14 @@ function formatDateTime(timestamp) {
   }).format(new Date(timestamp));
 }
 
+function formatDate(date) {
+  if (!date) return "—";
+
+  return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(
+    new Date(`${date}T00:00:00`),
+  );
+}
+
 function formatPower(value) {
   if (value.trim() === "") {
     return "";
@@ -149,13 +211,15 @@ function PrintablePrescription({ record }) {
     <article className="print-prescription">
       <header className="print-header">
         <div>
-          <h1>Eye Centre Optics</h1>
+          <h1>{SHOP_NAME}</h1>
           <p>Spectacles · Contact Lenses · Goggles</p>
         </div>
         <div className="print-shop-details">
-          <p>Shop No. 31, Sector 8, Panchkula — 134109, Haryana, India</p>
+          <p><strong>GSTIN {SHOP_GSTIN} · State code {SHOP_STATE_CODE}</strong></p>
+          <p>{SHOP_ADDRESS}</p>
+          <p>Tel: {SHOP_PHONE}</p>
           <p>Open all days · 10:00 am to 9:00 pm</p>
-          <p>anilgupta.eyecentre@gmail.com</p>
+          <p>{SHOP_EMAIL}</p>
         </div>
       </header>
 
@@ -223,6 +287,79 @@ function PrintablePrescription({ record }) {
   );
 }
 
+function PrintableBill({ record }) {
+  const order = record.order ?? createInitialOrder();
+  const particulars = [
+    order.frame && `Frame: ${order.frame}`,
+    order.lensType && `Lens: ${order.lensType}`,
+  ].filter(Boolean).join(" · ");
+
+  return (
+    <article className="print-bill">
+      <div className="bill-tax-line">
+        <strong>GSTIN: {SHOP_GSTIN}</strong>
+        <strong>GST / TAX INVOICE</strong>
+        <strong>State code: {SHOP_STATE_CODE}</strong>
+      </div>
+
+      <header className="bill-header">
+        <h1>{SHOP_NAME}</h1>
+        <p>Spectacles · Contact Lenses · Goggles</p>
+        <p>{SHOP_ADDRESS}</p>
+        <p>Tel: {SHOP_PHONE} · {SHOP_EMAIL}</p>
+      </header>
+
+      <section className="bill-meta-grid">
+        <div><span>Bill number</span><strong>{record.recordNumber}</strong></div>
+        <div><span>Invoice date</span><strong>{formatDate(record.createdAt.slice(0, 10))}</strong></div>
+        <div><span>Delivery date</span><strong>{formatDate(order.deliveryDate)}</strong></div>
+      </section>
+
+      <section className="bill-customer-grid">
+        <div><span>Customer name</span><strong>{record.customer.fullName}</strong></div>
+        <div><span>Phone</span><strong>{displayValue(record.customer.phone)}</strong></div>
+        <div className="bill-wide"><span>Address</span><strong>{record.customer.address}</strong></div>
+      </section>
+
+      <table className="bill-items">
+        <thead>
+          <tr><th>No.</th><th>Particulars</th><th>HSN code</th><th>Amount (₹)</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td>{displayValue(particulars)}</td>
+            <td>—</td>
+            <td>{Number(order.total || 0).toFixed(2)}</td>
+          </tr>
+          <tr className="bill-empty-row"><td /><td /><td /><td /></tr>
+        </tbody>
+      </table>
+
+      <section className="bill-summary">
+        <div className="bill-words">
+          <strong>Under Composite Scheme</strong>
+          <span>Rupees in words</span>
+          <p>{amountInWords(order.total)}</p>
+        </div>
+        <div className="bill-totals">
+          <span>Total</span><strong>₹{Number(order.total || 0).toFixed(2)}</strong>
+          <span>Advance</span><strong>₹{Number(order.advance || 0).toFixed(2)}</strong>
+          <span>Balance</span><strong>₹{calculateBalance(order.total, order.advance)}</strong>
+        </div>
+      </section>
+
+      <footer className="bill-footer">
+        <div>
+          <strong>Delivery after 5:00 pm.</strong>
+          <strong>No claim will be entertained if delivery is not taken within one month.</strong>
+        </div>
+        <div className="signature-line">Authorized signature</div>
+      </footer>
+    </article>
+  );
+}
+
 function LoginScreen({ authError, isSubmitting, onSignIn }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -235,15 +372,16 @@ function LoginScreen({ authError, isSubmitting, onSignIn }) {
   return (
     <main className="login-shell">
       <div className="login-layout">
-        <aside className="login-story" aria-label="Eye Centre Optics">
+        <aside className="login-story" aria-label={SHOP_NAME}>
           <div className="brand-mark" aria-hidden="true"><span /></div>
-          <p className="shop-kicker">Eye Centre Optics · Panchkula</p>
+          <p className="shop-kicker">{SHOP_NAME} · Panchkula</p>
           <h1>Clear vision.<br />Thoughtful care.</h1>
           <p>A secure workspace for customer records, precise prescriptions and dependable follow-up.</p>
           <div className="login-trust-line">
             <span>Optical records</span>
             <span>Secure cloud</span>
             <span>Ready to print</span>
+            <span>{SHOP_PHONE}</span>
           </div>
         </aside>
 
@@ -251,7 +389,7 @@ function LoginScreen({ authError, isSubmitting, onSignIn }) {
           <div className="login-card-brand">
             <div className="brand-mark brand-mark-small" aria-hidden="true"><span /></div>
             <div>
-              <strong>Eye Centre Optics</strong>
+              <strong>{SHOP_NAME}</strong>
               <span>Shop records</span>
             </div>
           </div>
@@ -309,6 +447,7 @@ function App() {
   const [isEditing, setIsEditing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [printRecord, setPrintRecord] = useState(null);
+  const [printType, setPrintType] = useState("prescription");
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(isSupabaseConfigured);
   const [authSubmitting, setAuthSubmitting] = useState(false);
@@ -665,6 +804,13 @@ function App() {
   }
 
   function handlePrintRecord(record) {
+    setPrintType("prescription");
+    setPrintRecord(record);
+    window.setTimeout(() => window.print(), 0);
+  }
+
+  function handlePrintBill(record) {
+    setPrintType("bill");
     setPrintRecord(record);
     window.setTimeout(() => window.print(), 0);
   }
@@ -703,7 +849,7 @@ function App() {
     const link = document.createElement("a");
 
     link.href = downloadUrl;
-    link.download = `eye-centre-optics-backup-${getLocalDate()}.csv`;
+    link.download = `eye-centre-backup-${getLocalDate()}.csv`;
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -743,8 +889,11 @@ function App() {
           <div className="brand-mark brand-mark-header" aria-hidden="true"><span /></div>
           <div>
             <p className="shop-kicker">Spectacles · Contact Lenses · Goggles</p>
-            <h1>Eye Centre Optics</h1>
-            <p>Shop No. 31, Sector 8, Panchkula — 134109, Haryana, India</p>
+            <h1>{SHOP_NAME}</h1>
+            <p>{SHOP_ADDRESS}</p>
+            <p className="shop-contact-details">
+              Tel: {SHOP_PHONE} · GSTIN: {SHOP_GSTIN} · State code: {SHOP_STATE_CODE}
+            </p>
           </div>
         </div>
         <div className="account-controls">
@@ -1261,7 +1410,14 @@ function App() {
                             type="button"
                             onClick={() => handlePrintRecord(record)}
                           >
-                            Print
+                            Prescription
+                          </button>
+                          <button
+                            className="print-record-button"
+                            type="button"
+                            onClick={() => handlePrintBill(record)}
+                          >
+                            Bill
                           </button>
                           <button
                             className="delete-record-button"
@@ -1282,7 +1438,8 @@ function App() {
         )}
       </main>
     </div>
-    {printRecord && <PrintablePrescription record={printRecord} />}
+    {printRecord && printType === "prescription" && <PrintablePrescription record={printRecord} />}
+    {printRecord && printType === "bill" && <PrintableBill record={printRecord} />}
     </>
   );
 }

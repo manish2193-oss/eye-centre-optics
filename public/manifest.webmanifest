@@ -1,7 +1,7 @@
 {
-  "name": "Eye Centre Optics",
+  "name": "Eye Centre",
   "short_name": "Eye Centre",
-  "description": "Customer records and optical prescriptions for Eye Centre Optics.",
+  "description": "Customer records and optical prescriptions for Eye Centre.",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",
